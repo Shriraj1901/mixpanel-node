@@ -13,7 +13,7 @@ describe("send_request", () => {
   beforeEach(() => {
     HttpsProxyAgent = vi.fn();
     Mixpanel = proxyquire("../lib/mixpanel-node", {
-      "https-proxy-agent": HttpsProxyAgent,
+      "https-proxy-agent": { HttpsProxyAgent },
     });
 
     http_emitter = new events.EventEmitter();
@@ -260,10 +260,9 @@ describe("send_request", () => {
     proxyMixpanel.send_request({ endpoint: "", data: {} });
 
     expect(HttpsProxyAgent).toHaveBeenCalledTimes(1);
-
-    const agentOpts = HttpsProxyAgent.mock.calls[0][0];
-    expect(agentOpts.pathname).toBe("this.aint.real.https");
-    expect(agentOpts.keepAlive).toBe(true);
+    expect(HttpsProxyAgent).toHaveBeenCalledWith("this.aint.real.https", {
+      keepAlive: true,
+    });
 
     const getConfig = https.request.mock.calls[0][0];
     expect(getConfig.agent).toBeTruthy();
@@ -278,12 +277,33 @@ describe("send_request", () => {
     proxyMixpanel.send_request({ endpoint: "", data: {} });
 
     expect(HttpsProxyAgent).toHaveBeenCalledTimes(1);
-
-    const proxyOpts = HttpsProxyAgent.mock.calls[0][0];
-    expect(proxyOpts.pathname).toBe("this.aint.real.https");
+    expect(HttpsProxyAgent).toHaveBeenCalledWith("this.aint.real.https", {
+      keepAlive: true,
+    });
 
     const getConfig = https.request.mock.calls[0][0];
     expect(getConfig.agent).toBeTruthy();
+  });
+
+  it("builds a working proxy agent from HTTPS_PROXY with the real https-proxy-agent", () => {
+    const {
+      HttpsProxyAgent: RealHttpsProxyAgent,
+    } = require("https-proxy-agent");
+    delete process.env.HTTP_PROXY;
+    process.env.HTTPS_PROXY = "http://user:secret@proxy.example.com:3128";
+
+    // no stub for https-proxy-agent here: init() must work with the real module
+    const RealMixpanel = proxyquire("../lib/mixpanel-node", {});
+    const proxyMixpanel = RealMixpanel.init("token");
+    proxyMixpanel.send_request({ endpoint: "", data: {} });
+
+    const { agent } = https.request.mock.calls[0][0];
+    expect(agent).toBeInstanceOf(RealHttpsProxyAgent);
+    expect(agent.proxy.hostname).toBe("proxy.example.com");
+    expect(agent.proxy.port).toBe("3128");
+    expect(agent.proxy.username).toBe("user");
+    expect(agent.proxy.password).toBe("secret");
+    expect(agent.keepAlive).toBe(true);
   });
 
   it("requires credentials for import requests", () => {

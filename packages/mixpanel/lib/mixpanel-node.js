@@ -11,8 +11,7 @@ const querystring = require("querystring");
 const Buffer = require("buffer").Buffer;
 const http = require("http");
 const https = require("https");
-const HttpsProxyAgent = require("https-proxy-agent");
-const url = require("url");
+const { HttpsProxyAgent } = require("https-proxy-agent");
 const packageInfo = require("../package.json");
 
 const { async_all, ensure_timestamp, assert_logger } = require("./utils");
@@ -60,11 +59,7 @@ const create_client = function (token, config) {
   };
   const proxyPath = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
   const proxyAgent = proxyPath
-    ? new HttpsProxyAgent(
-        Object.assign(url.parse(proxyPath), {
-          keepAlive,
-        }),
-      )
+    ? new HttpsProxyAgent(proxyPath, { keepAlive })
     : null;
 
   /**
